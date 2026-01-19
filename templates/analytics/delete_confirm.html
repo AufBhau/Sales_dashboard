@@ -1,0 +1,67 @@
+{% extends 'analytics/base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title text-danger mb-4">⚠️ Delete Sales Data</h3>
+                
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> This action cannot be undone! Please choose carefully.
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-danger">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Delete All Data</h5>
+                                <p class="card-text">This will delete ALL sales records from the database.</p>
+                                <form method="post" onsubmit="return confirm('Are you sure you want to delete ALL data? This cannot be undone!');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="delete_type" value="all">
+                                    <button type="submit" class="btn btn-danger">Delete All</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-warning">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Delete Filtered Data</h5>
+                                <p class="card-text">Delete only data matching your current filters.</p>
+                                <form method="post" onsubmit="return confirm('Are you sure you want to delete the filtered data?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="delete_type" value="filtered">
+                                    
+                                    <!-- Include filter fields -->
+                                    <div class="text-start mb-3">
+                                        <label class="form-label">Start Date:</label>
+                                        <input type="date" name="start_date" class="form-control">
+                                        
+                                        <label class="form-label mt-2">End Date:</label>
+                                        <input type="date" name="end_date" class="form-control">
+                                        
+                                        <label class="form-label mt-2">Product:</label>
+                                        <input type="text" name="product" class="form-control" placeholder="Product name">
+                                        
+                                        <label class="form-label mt-2">Region:</label>
+                                        <input type="text" name="region" class="form-control" placeholder="Region">
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-warning">Delete Filtered</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

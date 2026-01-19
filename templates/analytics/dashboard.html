@@ -1,0 +1,335 @@
+{% extends 'analytics/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Sales Dashboard</h2>
+    <div>
+        <a href="{% url 'upload_csv' %}" class="btn btn-primary me-2">📤 Upload CSV</a>
+        <a href="{% url 'export_report' %}?{{ request.GET.urlencode }}" class="btn btn-success me-2">📥 CSV</a>
+        <a href="{% url 'export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-success me-2">📊 Excel</a>
+        <a href="{% url 'delete_data' %}" class="btn btn-danger">🗑️ Delete</a>
+    </div>
+</div>
+
+<!-- Smart Insights Panel -->
+{% if insights %}
+<div class="card mb-4 border-info">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">🧠 Smart Insights</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for insight in insights %}
+            <div class="col-md-6 mb-3">
+                <div class="alert alert-{{ insight.type }} mb-0">
+                    <h6 class="alert-heading">{{ insight.icon }} {{ insight.title }}</h6>
+                    <p class="mb-0">{{ insight.message }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Comparison Mode Toggle -->
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h5 class="card-title mb-0">📊 Comparison Mode</h5>
+            </div>
+            <div class="col-md-6 text-end">
+                {% if comparison_mode == 'previous' %}
+                    <a href="?{{ request.GET.urlencode|slice:'8:' }}" class="btn btn-outline-secondary">
+                        Disable Comparison
+                    </a>
+                {% else %}
+                    <a href="?{{ request.GET.urlencode }}&compare=previous" class="btn btn-primary">
+                        Compare with Previous Period
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Date Presets -->
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title mb-3">⚡ Quick Date Filters</h5>
+        <div class="btn-group flex-wrap" role="group">
+            <a href="?preset=today{% if comparison_mode %}&compare={{ comparison_mode }}{% endif %}" 
+               class="btn btn-outline-primary {% if current_preset == 'today' %}active{% endif %}">Today</a>
+            <a href="?preset=last_7_days{% if comparison_mode %}&compare={{ comparison_mode }}{% endif %}" 
+               class="btn btn-outline-primary {% if current_preset == 'last_7_days' %}active{% endif %}">Last 7 Days</a>
+            <a href="?preset=last_30_days{% if comparison_mode %}&compare={{ comparison_mode }}{% endif %}" 
+               class="btn btn-outline-primary {% if current_preset == 'last_30_days' %}active{% endif %}">Last 30 Days</a>
+            <a href="?preset=this_month{% if comparison_mode %}&compare={{ comparison_mode }}{% endif %}" 
+               class="btn btn-outline-primary {% if current_preset == 'this_month' %}active{% endif %}">This Month</a>
+            <a href="?preset=last_month{% if comparison_mode %}&compare={{ comparison_mode }}{% endif %}" 
+               class="btn btn-outline-primary {% if current_preset == 'last_month' %}active{% endif %}">Last Month</a>
+            <a href="?preset=this_year{% if comparison_mode %}&compare={{ comparison_mode }}{% endif %}" 
+               class="btn btn-outline-primary {% if current_preset == 'this_year' %}active{% endif %}">This Year</a>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Clear All</a>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title mb-3">🔍 Custom Filters</h5>
+        <form method="get" action="{% url 'dashboard' %}" class="row g-3">
+            {% if comparison_mode %}
+            <input type="hidden" name="compare" value="{{ comparison_mode }}">
+            {% endif %}
+            <div class="col-md-3">
+                {{ filter_form.start_date.label_tag }}
+                {{ filter_form.start_date }}
+            </div>
+            <div class="col-md-3">
+                {{ filter_form.end_date.label_tag }}
+                {{ filter_form.end_date }}
+            </div>
+            <div class="col-md-2">
+                {{ filter_form.product.label_tag }}
+                {{ filter_form.product }}
+            </div>
+            <div class="col-md-2">
+                {{ filter_form.region.label_tag }}
+                {{ filter_form.region }}
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Metrics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card bg-primary text-white">
+            <div class="metric-value">${{ total_revenue|floatformat:2 }}</div>
+            <div class="metric-label">Total Revenue</div>
+            {% if comp_metrics %}
+            <div class="comparison-badge">
+                {% if comp_metrics.revenue_change > 0 %}
+                    <span class="badge bg-success">↑ {{ comp_metrics.revenue_change|floatformat:1 }}%</span>
+                {% elif comp_metrics.revenue_change < 0 %}
+                    <span class="badge bg-danger">↓ {{ comp_metrics.revenue_change|floatformat:1 }}%</span>
+                {% else %}
+                    <span class="badge bg-secondary">→ 0%</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card bg-info text-white">
+            <div class="metric-value">{{ total_leads }}</div>
+            <div class="metric-label">Total Leads</div>
+            {% if comp_metrics %}
+            <div class="comparison-badge">
+                {% if comp_metrics.leads_change > 0 %}
+                    <span class="badge bg-success">↑ {{ comp_metrics.leads_change|floatformat:1 }}%</span>
+                {% elif comp_metrics.leads_change < 0 %}
+                    <span class="badge bg-danger">↓ {{ comp_metrics.leads_change|floatformat:1 }}%</span>
+                {% else %}
+                    <span class="badge bg-secondary">→ 0%</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card bg-success text-white">
+            <div class="metric-value">{{ total_conversions }}</div>
+            <div class="metric-label">Conversions</div>
+            {% if comp_metrics %}
+            <div class="comparison-badge">
+                {% if comp_metrics.conversions_change > 0 %}
+                    <span class="badge bg-success">↑ {{ comp_metrics.conversions_change|floatformat:1 }}%</span>
+                {% elif comp_metrics.conversions_change < 0 %}
+                    <span class="badge bg-danger">↓ {{ comp_metrics.conversions_change|floatformat:1 }}%</span>
+                {% else %}
+                    <span class="badge bg-secondary">→ 0%</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card bg-warning text-white">
+            <div class="metric-value">{{ conversion_rate }}%</div>
+            <div class="metric-label">Conversion Rate</div>
+            {% if comp_metrics %}
+            <div class="comparison-badge">
+                {% if comp_metrics.conv_rate_change > 0 %}
+                    <span class="badge bg-success">↑ {{ comp_metrics.conv_rate_change|floatformat:1 }}%</span>
+                {% elif comp_metrics.conv_rate_change < 0 %}
+                    <span class="badge bg-danger">↓ {{ comp_metrics.conv_rate_change|floatformat:1 }}%</span>
+                {% else %}
+                    <span class="badge bg-secondary">→ 0%</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if charts %}
+<!-- Top Performers -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">🏆 Top 5 Products by Revenue</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Product</th>
+                                <th>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in top_products %}
+                            <tr>
+                                <td><span class="badge bg-primary">{{ forloop.counter }}</span></td>
+                                <td>{{ product.product }}</td>
+                                <td class="text-success fw-bold">${{ product.total|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">🌍 Top 5 Regions by Revenue</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Region</th>
+                                <th>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for region in top_regions %}
+                            <tr>
+                                <td><span class="badge bg-info">{{ forloop.counter }}</span></td>
+                                <td>{{ region.region }}</td>
+                                <td class="text-success fw-bold">${{ region.total|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Interactive Plotly Charts -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                {{ charts.revenue_trend|safe }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                {{ charts.product_revenue|safe }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                {{ charts.product_pie|safe }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                {{ charts.region_conversion|safe }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                {{ charts.region_pie|safe }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                {{ charts.leads_conversions|safe }}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-info text-center">
+    <h4>No data available. Upload a CSV file to get started!</h4>
+    <a href="{% url 'upload_csv' %}" class="btn btn-primary mt-3">📤 Upload CSV Now</a>
+</div>
+{% endif %}
+
+<style>
+    .metric-card {
+        color: white;
+        position: relative;
+        padding-bottom: 40px;
+    }
+    .metric-card .metric-value {
+        color: white;
+    }
+    .metric-card .metric-label {
+        color: rgba(255, 255, 255, 0.9);
+    }
+    .comparison-badge {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    .comparison-badge .badge {
+        font-size: 0.9rem;
+        padding: 5px 10px;
+    }
+    .btn-group .btn.active {
+        background-color: #0d6efd;
+        color: white;
+    }
+    .alert-heading {
+        margin-bottom: 5px;
+    }
+    .card {
+        transition: transform 0.2s;
+    }
+    .card:hover {
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}

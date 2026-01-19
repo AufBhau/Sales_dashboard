@@ -1,0 +1,11 @@
+date,product,region,revenue,leads,conversions
+2024-01-01,Product A,North,15000,150,45
+2024-01-02,Product B,South,12000,120,38
+2024-01-03,Product A,East,18000,180,52
+2024-01-04,Product C,West,9000,90,25
+2024-01-05,Product B,North,14000,140,42
+2024-01-06,Product A,South,16000,160,48
+2024-01-07,Product C,East,11000,110,30
+2024-01-15,Product A,North,17000,170,51
+2024-01-20,Product B,West,13000,130,40
+2024-01-25,Product C,South,10000,100,28
