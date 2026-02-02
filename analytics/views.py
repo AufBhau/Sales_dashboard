@@ -3,8 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
 from django.http import HttpResponse
-from django.db.models import Sum, Count, Q, Avg, F, FloatField
-from django.db.models.functions import Cast
+from django.contrib.auth.models import User 
+from django.db.models import Sum, Count, Q, Avg
 from .models import SalesData, CSVUpload
 from .forms import CSVUploadForm, FilterForm
 import pandas as pd
@@ -23,6 +23,9 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import json
 
+def home(request):
+    return render(request, 'analytics/home.html')
+
 def login_view(request):
     if request.method == 'POST':
         username = request.POST['username']
@@ -34,24 +37,57 @@ def login_view(request):
         messages.error(request, 'Invalid credentials')
     return render(request, 'analytics/login.html')
 
+
+def signup_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password1 = request.POST.get('password1')
+        password2 = request.POST.get('password2')
+        
+        if password1 != password2:
+            messages.error(request, 'Passwords do not match!')
+            return redirect('signup')
+        
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already exists!')
+            return redirect('signup')
+        
+        try:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password1
+            )
+            messages.success(request, 'Account created! Please login.')
+            return redirect('login')
+        except Exception as e:
+            messages.error(request, f'Error: {str(e)}')
+            return redirect('signup')
+    
+    return render(request, 'analytics/signup.html')
+
 def logout_view(request):
     logout(request)
     return redirect('login')
 
 def calculate_insights(current_data, comparison_data=None):
-    """Generate smart insights from data"""
     insights = []
     
     if not current_data.exists():
         return insights
     
-    # Current period metrics
-    current_revenue = current_data.aggregate(Sum('revenue'))['revenue__sum'] or 0
-    current_leads = current_data.aggregate(Sum('leads'))['leads__sum'] or 0
-    current_conversions = current_data.aggregate(Sum('conversions'))['conversions__sum'] or 0
-    current_conv_rate = (current_conversions / current_leads * 100) if current_leads > 0 else 0
+    def to_float(value):
+        """Safely convert Decimal to float"""
+        if value is None:
+            return 0.0
+        return float(value)
     
-    # Best/Worst performers
+    current_revenue = to_float(current_data.aggregate(Sum('revenue'))['revenue__sum'] or 0)
+    current_leads = to_float(current_data.aggregate(Sum('leads'))['leads__sum'] or 0)
+    current_conversions = to_float(current_data.aggregate(Sum('conversions'))['conversions__sum'] or 0)
+    current_conv_rate = (current_conversions / current_leads * 100) if current_leads > 0 else 0
+
     products = current_data.values('product').annotate(
         total=Sum('revenue')
     ).order_by('-total')
@@ -60,9 +96,8 @@ def calculate_insights(current_data, comparison_data=None):
         best_product = products[0]
         worst_product = products[len(products)-1]
         
-        # Convert Decimal to float for comparisons
-        best_total = float(best_product['total']) if best_product['total'] else 0
-        worst_total = float(worst_product['total']) if worst_product['total'] else 0
+        best_total = to_float(best_product['total'])
+        worst_total = to_float(worst_product['total'])
         
         insights.append({
             'type': 'success',
@@ -79,37 +114,33 @@ def calculate_insights(current_data, comparison_data=None):
                 'message': f"{worst_product['product']} needs attention (${worst_total:,.2f})"
             })
     
-    # Regional insights - FIXED VERSION
     regions = current_data.values('region').annotate(
+        total=Sum('revenue'),
         total_leads=Sum('leads'),
-        total_conversions=Sum('conversions'),
-        total_revenue=Sum('revenue')
-    )
+        total_conversions=Sum('conversions')
+    ).order_by('-total')
     
-    # Calculate conversion rate manually after aggregation
-    region_list = []
-    for region in regions:
-        if region['total_leads'] and region['total_leads'] > 0:
-            conv_rate = (region['total_conversions'] / region['total_leads']) * 100
-            region_list.append({
-                'region': region['region'],
-                'conv_rate': conv_rate,
-                'revenue': region['total_revenue']
+    if regions:
+        best_region = None
+        best_conv_rate = 0
+        
+        for region in regions:
+            leads = to_float(region['total_leads'] or 1)
+            conversions = to_float(region['total_conversions'] or 0)
+            conv_rate = (conversions / leads * 100) if leads > 0 else 0
+            
+            if conv_rate > best_conv_rate:
+                best_conv_rate = conv_rate
+                best_region = region
+        
+        if best_region:
+            insights.append({
+                'type': 'info',
+                'icon': '🌍',
+                'title': 'Best Region',
+                'message': f"{best_region['region']} has highest conversion rate at {best_conv_rate:.1f}%"
             })
     
-    # Sort by conversion rate
-    region_list.sort(key=lambda x: x['conv_rate'], reverse=True)
-    
-    if region_list:
-        best_region = region_list[0]
-        insights.append({
-            'type': 'info',
-            'icon': '🌍',
-            'title': 'Best Region',
-            'message': f"{best_region['region']} has highest conversion rate at {best_region['conv_rate']:.1f}%"
-        })
-    
-    # Conversion rate insight
     if current_conv_rate > 30:
         insights.append({
             'type': 'success',
@@ -125,21 +156,13 @@ def calculate_insights(current_data, comparison_data=None):
             'message': f"Conversion rate of {current_conv_rate:.1f}% could be improved"
         })
     
-    # Comparison insights
     if comparison_data and comparison_data.exists():
-        comp_revenue = comparison_data.aggregate(Sum('revenue'))['revenue__sum'] or 0
-        comp_leads = comparison_data.aggregate(Sum('leads'))['leads__sum'] or 0
-        comp_conversions = comparison_data.aggregate(Sum('conversions'))['conversions__sum'] or 0
-        
-        # Convert to float for calculations
-        comp_revenue = float(comp_revenue) if comp_revenue else 0
-        comp_leads = float(comp_leads) if comp_leads else 0
-        comp_conversions = float(comp_conversions) if comp_conversions else 0
-        current_revenue_float = float(current_revenue) if current_revenue else 0
-        current_leads_float = float(current_leads) if current_leads else 0
+        comp_revenue = to_float(comparison_data.aggregate(Sum('revenue'))['revenue__sum'] or 0)
+        comp_leads = to_float(comparison_data.aggregate(Sum('leads'))['leads__sum'] or 0)
+        comp_conversions = to_float(comparison_data.aggregate(Sum('conversions'))['conversions__sum'] or 0)
         
         if comp_revenue > 0:
-            revenue_change = ((current_revenue_float - comp_revenue) / comp_revenue * 100)
+            revenue_change = ((current_revenue - comp_revenue) / comp_revenue * 100)
             if abs(revenue_change) > 5:
                 icon = '📈' if revenue_change > 0 else '📉'
                 change_type = 'success' if revenue_change > 0 else 'danger'
@@ -152,7 +175,7 @@ def calculate_insights(current_data, comparison_data=None):
                 })
         
         if comp_leads > 0:
-            leads_change = ((current_leads_float - comp_leads) / comp_leads * 100)
+            leads_change = ((current_leads - comp_leads) / comp_leads * 100)
             if abs(leads_change) > 10:
                 icon = '🚀' if leads_change > 0 else '⬇️'
                 change_type = 'info' if leads_change > 0 else 'warning'
@@ -164,7 +187,6 @@ def calculate_insights(current_data, comparison_data=None):
                     'message': f"Leads {direction} {abs(leads_change):.1f}% from previous period"
                 })
     
-    # Data freshness
     latest_date = current_data.order_by('-date').first()
     if latest_date:
         days_old = (datetime.now().date() - latest_date.date).days
@@ -180,14 +202,12 @@ def calculate_insights(current_data, comparison_data=None):
 
 @login_required
 def dashboard(request):
-    # Get comparison mode
+
     comparison_mode = request.GET.get('compare', '')
     
-    # Get all sales data
     sales_data = SalesData.objects.all()
     comparison_data = None
     
-    # Handle date presets
     preset = request.GET.get('preset', '')
     today = datetime.now().date()
     
@@ -231,7 +251,6 @@ def dashboard(request):
         if comparison_mode == 'previous':
             comparison_data = SalesData.objects.filter(date__year=today.year - 1)
     
-    # Apply custom filters
     filter_form = FilterForm(request.GET)
     if filter_form.is_valid():
         if filter_form.cleaned_data['start_date']:
@@ -243,18 +262,21 @@ def dashboard(request):
         if filter_form.cleaned_data['region']:
             sales_data = sales_data.filter(region__icontains=filter_form.cleaned_data['region'])
     
-    # Calculate metrics
-    total_revenue = sales_data.aggregate(Sum('revenue'))['revenue__sum'] or 0
-    total_leads = sales_data.aggregate(Sum('leads'))['leads__sum'] or 0
-    total_conversions = sales_data.aggregate(Sum('conversions'))['conversions__sum'] or 0
-    conversion_rate = (total_conversions / total_leads * 100) if total_leads > 0 else 0
+    def to_float(value):
+        if value is None:
+            return 0.0
+        return float(value)
     
-    # Comparison metrics
+    total_revenue = to_float(sales_data.aggregate(Sum('revenue'))['revenue__sum'] or 0)
+    total_leads = to_float(sales_data.aggregate(Sum('leads'))['leads__sum'] or 0)
+    total_conversions = to_float(sales_data.aggregate(Sum('conversions'))['conversions__sum'] or 0)
+    conversion_rate = (total_conversions / total_leads * 100) if total_leads > 0 else 0
+
     comp_metrics = None
     if comparison_data and comparison_data.exists():
-        comp_revenue = comparison_data.aggregate(Sum('revenue'))['revenue__sum'] or 0
-        comp_leads = comparison_data.aggregate(Sum('leads'))['leads__sum'] or 0
-        comp_conversions = comparison_data.aggregate(Sum('conversions'))['conversions__sum'] or 0
+        comp_revenue = to_float(comparison_data.aggregate(Sum('revenue'))['revenue__sum'] or 0)
+        comp_leads = to_float(comparison_data.aggregate(Sum('leads'))['leads__sum'] or 0)
+        comp_conversions = to_float(comparison_data.aggregate(Sum('conversions'))['conversions__sum'] or 0)
         comp_conv_rate = (comp_conversions / comp_leads * 100) if comp_leads > 0 else 0
         
         comp_metrics = {
@@ -268,7 +290,6 @@ def dashboard(request):
             'conv_rate_change': conversion_rate - comp_conv_rate,
         }
     
-    # Top Performers
     top_products = sales_data.values('product').annotate(
         total=Sum('revenue')
     ).order_by('-total')[:5]
@@ -277,10 +298,8 @@ def dashboard(request):
         total=Sum('revenue')
     ).order_by('-total')[:5]
     
-    # Generate Smart Insights
     insights = calculate_insights(sales_data, comparison_data)
     
-    # Generate interactive Plotly charts
     charts = generate_plotly_charts(sales_data)
     
     context = {
@@ -301,14 +320,17 @@ def dashboard(request):
     return render(request, 'analytics/dashboard.html', context)
 
 def generate_plotly_charts(queryset):
-    """Generate interactive Plotly charts"""
     if not queryset.exists():
         return {}
     
     df = pd.DataFrame(list(queryset.values('date', 'product', 'region', 'revenue', 'leads', 'conversions')))
+    
+    df['revenue'] = df['revenue'].astype(float)
+    df['leads'] = df['leads'].astype(float)
+    df['conversions'] = df['conversions'].astype(float)
+    
     charts = {}
     
-    # 1. Revenue Trend (Line Chart)
     df_grouped = df.groupby('date')['revenue'].sum().reset_index()
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -330,7 +352,6 @@ def generate_plotly_charts(queryset):
     )
     charts['revenue_trend'] = fig.to_html(full_html=False, include_plotlyjs='cdn')
     
-    # 2. Product Revenue (Bar Chart)
     product_revenue = df.groupby('product')['revenue'].sum().sort_values(ascending=False)
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -348,7 +369,6 @@ def generate_plotly_charts(queryset):
     )
     charts['product_revenue'] = fig.to_html(full_html=False, include_plotlyjs='cdn')
     
-    # 3. Product Revenue Pie Chart
     fig = go.Figure()
     fig.add_trace(go.Pie(
         labels=product_revenue.index,
@@ -364,7 +384,6 @@ def generate_plotly_charts(queryset):
     )
     charts['product_pie'] = fig.to_html(full_html=False, include_plotlyjs='cdn')
     
-    # 4. Conversion Rate by Region
     region_data = df.groupby('region').agg({'leads': 'sum', 'conversions': 'sum'})
     region_data['conv_rate'] = (region_data['conversions'] / region_data['leads'] * 100).fillna(0)
     fig = go.Figure()
@@ -383,7 +402,6 @@ def generate_plotly_charts(queryset):
     )
     charts['region_conversion'] = fig.to_html(full_html=False, include_plotlyjs='cdn')
     
-    # 5. Region Revenue Pie Chart
     region_revenue = df.groupby('region')['revenue'].sum()
     fig = go.Figure()
     fig.add_trace(go.Pie(
@@ -400,7 +418,6 @@ def generate_plotly_charts(queryset):
     )
     charts['region_pie'] = fig.to_html(full_html=False, include_plotlyjs='cdn')
     
-    # 6. Leads vs Conversions (Grouped Bar)
     product_data = df.groupby('product').agg({'leads': 'sum', 'conversions': 'sum'})
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -503,7 +520,7 @@ def export_report(request):
             sale.date,
             sale.product,
             sale.region,
-            sale.revenue,
+            float(sale.revenue),
             sale.leads,
             sale.conversions,
             f"{conv_rate:.2f}%"
@@ -526,6 +543,11 @@ def export_excel(request):
         if filter_form.cleaned_data['region']:
             sales_data = sales_data.filter(region__icontains=filter_form.cleaned_data['region'])
     
+    def to_float(value):
+        if value is None:
+            return 0.0
+        return float(value)
+    
     wb = Workbook()
     ws = wb.active
     ws.title = "Sales Report"
@@ -547,7 +569,7 @@ def export_excel(request):
             sale.date.strftime('%Y-%m-%d'),
             sale.product,
             sale.region,
-            float(sale.revenue),
+            to_float(sale.revenue),
             sale.leads,
             sale.conversions,
             f"{conv_rate:.2f}%"
@@ -571,13 +593,13 @@ def export_excel(request):
     ws2['A1'].font = header_font
     ws2['B1'].font = header_font
     
-    total_revenue = sales_data.aggregate(Sum('revenue'))['revenue__sum'] or 0
-    total_leads = sales_data.aggregate(Sum('leads'))['leads__sum'] or 0
-    total_conversions = sales_data.aggregate(Sum('conversions'))['conversions__sum'] or 0
+    total_revenue = to_float(sales_data.aggregate(Sum('revenue'))['revenue__sum'] or 0)
+    total_leads = to_float(sales_data.aggregate(Sum('leads'))['leads__sum'] or 0)
+    total_conversions = to_float(sales_data.aggregate(Sum('conversions'))['conversions__sum'] or 0)
     conversion_rate = (total_conversions / total_leads * 100) if total_leads > 0 else 0
     
     ws2['A2'] = "Total Revenue"
-    ws2['B2'] = float(total_revenue)
+    ws2['B2'] = total_revenue
     ws2['A3'] = "Total Leads"
     ws2['B3'] = total_leads
     ws2['A4'] = "Total Conversions"

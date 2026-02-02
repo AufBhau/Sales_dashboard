@@ -1,30 +1,621 @@
-{% extends 'analytics/base.html' %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload CSV - SalesDash</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #8b5cf6;
+            --dark-bg: #0f172a;
+            --dark-card: #1e293b;
+            --dark-text: #f1f5f9;
+            --light-bg: #f8fafc;
+            --light-card: #ffffff;
+            --light-text: #1e293b;
+        }
 
-{% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-body">
-                <h3 class="card-title mb-4">Upload Sales CSV</h3>
-                
-                <div class="alert alert-info">
-                    <strong>CSV Format Required:</strong><br>
-                    Columns: <code>date, product, region, revenue, leads, conversions</code>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        body.dark-mode {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        }
+
+        .upload-container {
+            max-width: 700px;
+            width: 100%;
+        }
+
+        .upload-card {
+            background: var(--light-card);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 3rem;
+            animation: slideUp 0.5s ease;
+        }
+
+        .dark-mode .upload-card {
+            background: var(--dark-card);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .logo-icon i {
+            font-size: 30px;
+            color: white;
+        }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .upload-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .upload-title {
+            color: var(--light-text);
+            margin-bottom: 0.5rem;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .dark-mode .upload-title {
+            color: var(--dark-text);
+        }
+
+        .upload-subtitle {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 2rem;
+        }
+
+        .dark-mode .upload-subtitle {
+            color: #94a3b8;
+        }
+
+        .requirements-box {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .dark-mode .requirements-box {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .requirements-title {
+            color: var(--primary-color);
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 16px;
+        }
+
+        .requirements-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .requirements-list li {
+            color: var(--light-text);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            font-size: 14px;
+        }
+
+        .dark-mode .requirements-list li {
+            color: var(--dark-text);
+        }
+
+        .requirements-list i {
+            color: var(--primary-color);
+            font-size: 16px;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .requirements-list code {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 2px 8px;
+            border-radius: 5px;
+            color: var(--primary-color);
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .drop-zone {
+            border: 3px dashed #cbd5e1;
+            border-radius: 15px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        .dark-mode .drop-zone {
+            border-color: #475569;
+        }
+
+        .drop-zone:hover {
+            border-color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .drop-zone.dragover {
+            border-color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.1);
+            transform: scale(1.02);
+        }
+
+        .drop-zone-icon {
+            font-size: 50px;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        .drop-zone-text {
+            color: var(--light-text);
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .dark-mode .drop-zone-text {
+            color: var(--dark-text);
+        }
+
+        .drop-zone-hint {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .dark-mode .drop-zone-hint {
+            color: #94a3b8;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .selected-file {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+            border: 2px solid var(--primary-color);
+            border-radius: 15px;
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+            display: none;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .selected-file.active {
+            display: flex;
+        }
+
+        .file-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--primary-color);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .file-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            color: var(--light-text);
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            font-size: 15px;
+            word-break: break-all;
+        }
+
+        .dark-mode .file-name {
+            color: var(--dark-text);
+        }
+
+        .file-size {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .dark-mode .file-size {
+            color: #94a3b8;
+        }
+
+        .remove-file {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .remove-file:hover {
+            background: #dc2626;
+            transform: scale(1.1);
+        }
+
+        .btn-upload {
+            width: 100%;
+            padding: 0.85rem;
+            font-size: 16px;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            border-radius: 10px;
+            color: white;
+            transition: all 0.3s ease;
+            margin-top: 1.5rem;
+        }
+
+        .btn-upload:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-upload:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-upload:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .back-link a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            padding: 10px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .dark-mode .theme-toggle {
+            background: rgba(30, 41, 59, 0.5);
+            border-color: rgba(100, 116, 139, 0.3);
+        }
+
+        .alert {
+            border-radius: 10px;
+            border: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .sample-hint {
+            text-align: center;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 2px solid #e2e8f0;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .dark-mode .sample-hint {
+            border-top-color: #334155;
+            color: #94a3b8;
+        }
+
+        @media (max-width: 576px) {
+            .upload-card {
+                padding: 2rem;
+            }
+
+            .drop-zone {
+                padding: 2rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Toggle -->
+    <div class="theme-toggle" onclick="toggleTheme()">
+        <i class="fas fa-sun" id="theme-icon"></i>
+        <span id="theme-text">Light</span>
+    </div>
+
+    <div class="upload-container">
+        <div class="upload-card">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i class="fas fa-chart-line"></i>
                 </div>
+                <h1 class="logo-text">SalesDash</h1>
+            </div>
+
+            <div class="upload-header">
+                <h2 class="upload-title">Upload Sales Data</h2>
+                <p class="upload-subtitle">Import your CSV file to start analyzing</p>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="requirements-box">
+                <div class="requirements-title">
+                    <i class="fas fa-info-circle"></i>
+                    CSV Format Requirements
+                </div>
+                <ul class="requirements-list">
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Required columns: <code>date, product, region, revenue, leads, conversions</code></span>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Date format: <code>YYYY-MM-DD</code> (e.g., 2024-01-15)</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Numbers only for revenue, leads, and conversions</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        <span>Maximum file size: 10 MB</span>
+                    </li>
+                </ul>
+            </div>
+
+            <form method="post" enctype="multipart/form-data" id="uploadForm">
+                {% csrf_token %}
                 
-                <form method="post" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        {{ form.file.label_tag }}
-                        {{ form.file }}
+                <div class="drop-zone" id="dropZone">
+                    <i class="fas fa-cloud-upload-alt drop-zone-icon"></i>
+                    <div class="drop-zone-text">Click to browse or drag & drop</div>
+                    <div class="drop-zone-hint">Supports CSV files only</div>
+                    <input type="file" name="file" id="fileInput" class="file-input" accept=".csv" required>
+                </div>
+
+                <div class="selected-file" id="selectedFile">
+                    <div class="file-icon">
+                        <i class="fas fa-file-csv"></i>
                     </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">Upload</button>
-                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cancel</a>
+                    <div class="file-details">
+                        <div class="file-name" id="fileName"></div>
+                        <div class="file-size" id="fileSize"></div>
                     </div>
-                </form>
+                    <button type="button" class="remove-file" id="removeFile">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <button type="submit" class="btn-upload" id="uploadBtn" disabled>
+                    <i class="fas fa-upload me-2"></i>Upload & Process
+                </button>
+
+                <p class="sample-hint">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    Need help? Download our <a href="#" style="color: var(--primary-color); text-decoration: none;">sample CSV template</a>
+                </p>
+            </form>
+
+            <div class="back-link">
+                <a href="{% url 'dashboard' %}">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Dashboard
+                </a>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Theme Toggle
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            
+            body.classList.toggle('dark-mode');
+            
+            if (body.classList.contains('dark-mode')) {
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+                themeText.textContent = 'Dark';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+                themeText.textContent = 'Light';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        // Load saved theme
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+                themeText.textContent = 'Dark';
+            }
+        });
+
+        // File upload functionality
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const selectedFile = document.getElementById('selectedFile');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeFile = document.getElementById('removeFile');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        // Click to browse
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // File selected
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.csv')) {
+                fileInput.files = e.dataTransfer.files;
+                handleFile(file);
+            } else {
+                alert('Please upload a CSV file');
+            }
+        });
+
+        // Remove file
+        removeFile.addEventListener('click', () => {
+            fileInput.value = '';
+            selectedFile.classList.remove('active');
+            uploadBtn.disabled = true;
+        });
+
+        // Handle file
+        function handleFile(file) {
+            if (file) {
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                selectedFile.classList.add('active');
+                uploadBtn.disabled = false;
+            }
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
+            else return (bytes / 1048576).toFixed(2) + ' MB';
+        }
+    </script>
+</body>
+</html>
